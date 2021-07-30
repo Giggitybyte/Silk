@@ -14,16 +14,16 @@ namespace Silk.Core.Services.Bot.Music
 		public TimeSpan RemainingDuration => TimeSpan.FromSeconds(RemainingSeconds);
 		internal int RemainingSeconds { get; set; }
 		
-		public int RemainingTracks => _queue.Count;
+		public int RemainingTracks => Queue.Count;
 
-		private readonly ConcurrentQueue<Lazy<Task<MusicTrack?>>> _queue = new();
+		public ConcurrentQueue<Lazy<Task<MusicTrack?>>> Queue { get; } = new();
 
-		public void Enqueue(Func<Task<MusicTrack?>> queueFunc) => _queue.Enqueue(new(queueFunc));
+		public void Enqueue(Func<Task<MusicTrack?>> queueFunc) => Queue.Enqueue(new(queueFunc));
 
 
 		public async Task<bool> PreloadAsync()
 		{
-			var dequeued = _queue.TryDequeue(out var npLazy);
+			var dequeued = Queue.TryDequeue(out var npLazy);
 
 			if (dequeued) 
 				_nextUp = await npLazy!.Value;
@@ -41,7 +41,7 @@ namespace Silk.Core.Services.Bot.Music
 				return true;
 			}
 			
-			var dequeued = _queue.TryDequeue(out var npLazy);
+			var dequeued = Queue.TryDequeue(out var npLazy);
 
 			if (dequeued)
 			{
@@ -53,7 +53,7 @@ namespace Silk.Core.Services.Bot.Music
 		}
 		public void Dispose()
 		{
-			_queue.Clear();
+			Queue.Clear();
 		}
 	}
 }

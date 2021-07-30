@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Dasync.Collections;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
@@ -11,6 +13,7 @@ using DSharpPlus.Interactivity.Extensions;
 using Silk.Core.Types;
 using Silk.Core.Utilities.Bot;
 using Silk.Core.Utilities.HttpClient;
+using Silk.Extensions.DSharpPlus;
 using YoutubeExplode;
 using YoutubeExplode.Playlists;
 using YoutubeExplode.Videos;
@@ -80,7 +83,7 @@ namespace Silk.Core.Services.Bot.Music
 
 			message = result switch
 			{
-				MusicPlayResult.NowPlaying => $"Now playing {_music.GetNowPlayingTitle(ctx.Guild.Id)?.Title}!",
+				MusicPlayResult.NowPlaying => $"Now playing {_music.GetNowPlaying(ctx.Guild.Id)?.Title}!",
 				MusicPlayResult.AlreadyPlaying => "Queued 1 song.",
 				_ => $"Unexpected response {result}"
 			};
@@ -154,7 +157,7 @@ namespace Silk.Core.Services.Bot.Music
 
 			message = result switch
 			{
-				MusicPlayResult.NowPlaying => $"Now playing {_music.GetNowPlayingTitle(ctx.Guild.Id)?.Title}!",
+				MusicPlayResult.NowPlaying => $"Now playing {_music.GetNowPlaying(ctx.Guild.Id)?.Title}!",
 				MusicPlayResult.AlreadyPlaying => $"Queued {videos.Count()} video(s).",
 				_ => $"Unexpected response {result}"
 			};
@@ -187,6 +190,45 @@ namespace Silk.Core.Services.Bot.Music
 		[RequrieSameVC]
 		public async Task Pause(CommandContext ctx) => _music.Pause(ctx.Guild.Id);
 
+		[Command]
+		public async Task Queue(CommandContext ctx)
+		{
+			if (ctx.Guild.CurrentMember.VoiceState?.Channel is null)
+			{
+				await ctx.RespondAsync("I'm not even in a voice channel!");
+				return;
+			}
+			
+			var results = await _music.GetQueuedTracksAsync(ctx.Guild.Id).ToListAsync();
+
+			if (!results.Any())
+			{
+				await ctx.RespondAsync("There's nothing in the queue.");
+			}
+			else
+			{
+				var embed = new DiscordEmbedBuilder().WithTitle($"Queue for {ctx.Guild.Name}!");
+				var sbuilder = new StringBuilder();
+				
+				var truncatedResults = results.Take(10).ToList();
+
+				var nowPlaying = _music.GetNowPlaying(ctx.Guild.Id)!;
+				sbuilder.AppendLine($"⬇ **Now Playing** ⬇\n\n**{nowPlaying.Title}**\n​\t{nowPlaying.Duration:c} - Requested by {nowPlaying.Requester.Mention}\n");
+				
+				foreach (var result in truncatedResults)
+					sbuilder.AppendLine($"{result.Title}\n​\t{result.Duration:c} - Requested by {result.Requester.Mention}\n");
+
+				if (results.Count > truncatedResults.Count)
+					sbuilder.AppendLine($"Plus {results.Count + truncatedResults.Count} more.");
+
+				embed.WithDescription(sbuilder.ToString());
+				embed.WithColor(DiscordColor.Azure);
+				embed.WithAuthor(ctx.User.Username, ctx.User.GetUrl(), ctx.User.AvatarUrl);
+
+				await ctx.RespondAsync(embed);
+			}
+		}
+		
 		[Command]
 		[RequrieVC]
 		[RequrieSameVC]

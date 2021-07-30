@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using DSharpPlus.VoiceNext;
 using Microsoft.Extensions.Logging;
+using YoutubeExplode;
 
 namespace Silk.Core.Services.Bot.Music
 {
@@ -21,20 +23,23 @@ namespace Silk.Core.Services.Bot.Music
 
 		private readonly SemaphoreSlim _lock = new(1);
 		
+		private readonly YoutubeClient _youtubeClient;
 		private readonly DiscordShardedClient _client;
 		private readonly ILogger<MusicVoiceService> _logger;
 		
-		public MusicVoiceService(DiscordShardedClient client, ILogger<MusicVoiceService> logger)
+		public MusicVoiceService(DiscordShardedClient client, ILogger<MusicVoiceService> logger, YoutubeClient youtubeClient)
 		{
 			_client = client;
 			_logger = logger;
+			_youtubeClient = youtubeClient;
 
 			_client.VoiceStateUpdated += VoiceStateUpdated;
 		}
-
 		~MusicVoiceService() => _client.VoiceStateUpdated -= VoiceStateUpdated;
 		
-		public MusicTrack? GetNowPlayingTitle(ulong guildId)
+		
+		
+		public MusicTrack? GetNowPlaying(ulong guildId)
 		{
 			if (!_states.TryGetValue(guildId, out var state))
 				return null;
@@ -43,6 +48,20 @@ namespace Silk.Core.Services.Bot.Music
 				return null;
 
 			else return state.NowPlaying;
+		}
+		
+		/// <summary>
+		/// Returns the currently queued tracks for the specified guild.
+		/// </summary>
+		/// <param name="guildId">The id of the guild to get the tracks for.</param>
+		/// <returns>The queued tracks.</returns>
+		public async IAsyncEnumerable<MusicTrack> GetQueuedTracksAsync(ulong guildId)
+		{
+			if (!_states.TryGetValue(guildId, out var state))
+				yield break;
+
+			foreach (var lazy in state.Queue.Queue)
+				yield return await lazy.Value;
 		}
 
 		#region Connection API
@@ -55,7 +74,6 @@ namespace Silk.Core.Services.Bot.Music
 		/// <returns>A <see cref="VoiceResult"/> with the result of trying to join.</returns>
 		public async Task<VoiceResult> JoinAsync(DiscordChannel voiceChannel, DiscordChannel commandChannel)
 		{
-			
 			if (voiceChannel.Type is not (ChannelType.Voice or ChannelType.Stage))
 				return VoiceResult.NonVoiceBasedChannel;
 
