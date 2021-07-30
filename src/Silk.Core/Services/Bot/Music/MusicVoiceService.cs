@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
+using DSharpPlus.EventArgs;
 using DSharpPlus.VoiceNext;
+using Microsoft.Extensions.Logging;
 
 namespace Silk.Core.Services.Bot.Music
 {
@@ -14,26 +17,36 @@ namespace Silk.Core.Services.Bot.Music
 		/// The states of any given guild.
 		/// </summary>
 		private readonly ConcurrentDictionary<ulong, MusicState> _states = new();
+		private readonly ConcurrentDictionary<ulong, CancellationTokenSource> _watchdogs = new();
 
 		private readonly SemaphoreSlim _lock = new(1);
 		
 		private readonly DiscordShardedClient _client;
-		public MusicVoiceService(DiscordShardedClient client)
+		private readonly ILogger<MusicVoiceService> _logger;
+		
+		public MusicVoiceService(DiscordShardedClient client, ILogger<MusicVoiceService> logger)
 		{
 			_client = client;
+			_logger = logger;
+
+			_client.VoiceStateUpdated += VoiceStateUpdated;
 		}
 
-		public string GetNowPlayingTitle(ulong guildId)
+		~MusicVoiceService() => _client.VoiceStateUpdated -= VoiceStateUpdated;
+		
+		public MusicTrack? GetNowPlayingTitle(ulong guildId)
 		{
 			if (!_states.TryGetValue(guildId, out var state))
-				return "Nothing.";
+				return null;
 
 			if (state.NowPlaying is null)
-				return "Nothing.";
+				return null;
 
-			else return $"**{state.NowPlaying.Title}**";
+			else return state.NowPlaying;
 		}
 
+		#region Connection API
+		
 		/// <summary>
 		/// Joins a new channel.
 		/// </summary>
@@ -42,6 +55,7 @@ namespace Silk.Core.Services.Bot.Music
 		/// <returns>A <see cref="VoiceResult"/> with the result of trying to join.</returns>
 		public async Task<VoiceResult> JoinAsync(DiscordChannel voiceChannel, DiscordChannel commandChannel)
 		{
+			
 			if (voiceChannel.Type is not (ChannelType.Voice or ChannelType.Stage))
 				return VoiceResult.NonVoiceBasedChannel;
 
@@ -53,6 +67,8 @@ namespace Silk.Core.Services.Bot.Music
 			
 			var vnext = _client.GetShard(voiceChannel.Guild).GetVoiceNext();
 
+			await _lock.WaitAsync();
+			
 			if (vnext.GetConnection(voiceChannel.Guild) is { } vnextConnection)
 				vnextConnection.Disconnect();
 
@@ -71,7 +87,7 @@ namespace Silk.Core.Services.Bot.Music
 				Connection =  connection,
 				CommandChannel = commandChannel
 			};
-
+			
 			state.TrackEnded += async (s, _) => await PlayAsync((s as MusicState)!.ConnectedChannel.Guild.Id);
 			
 			if (voiceChannel.Type is ChannelType.Stage)
@@ -83,12 +99,97 @@ namespace Silk.Core.Services.Bot.Music
 				catch
 				{
 					await voiceChannel.UpdateCurrentUserVoiceStateAsync(true, DateTimeOffset.Now);
+					_lock.Release();
 					return VoiceResult.CannotUnsupress;
 				}
 			}
-			
+
+			_lock.Release();
 			return VoiceResult.Succeeded;
 		}
+
+		public async Task LeaveAsync(ulong guildId)
+		{
+			if (!_states.TryGetValue(guildId, out var state))
+			{
+				_logger.LogTrace("Not connected to a channel, but LeaveAsync was called.");
+				return;
+			}
+			
+			_logger.LogDebug("Disposing of resources and preparring to leave channel.");
+
+			try
+			{
+				state.Connection.Dispose();
+				_logger.LogDebug("Disposed of VNext connection.");
+			}
+			catch (Exception e)
+			{
+				_logger.LogTrace(e, "An exception was thrown while disposing of the VNext connection.");
+			}
+			
+			state.Queue.Dispose();
+			state.Dispose();
+			_states.TryRemove(guildId, out _);
+			
+			_logger.LogDebug("Disposed of voice-related resources.");
+		}
+
+		private async Task VoiceStateUpdated(DiscordClient c, VoiceStateUpdateEventArgs e)
+		{
+			if (!_states.TryGetValue(e.Guild.Id, out var state))
+				return;
+			
+			if (e.User != _client.CurrentUser)
+			{
+				if (e.Guild.CurrentMember.VoiceState?.Channel?.Users.Count() == 1)
+				{
+					_logger.LogDebug("Starting watchdog for {ChannelId}", e.Channel.Id);
+					var token = (_watchdogs[e.Guild.Id] = new(TimeSpan.FromMinutes(2))).Token;
+
+					Task.Run(async () =>
+					{
+						try
+						{
+							await Task.Delay(TimeSpan.FromSeconds(20), token);
+							c.GetVoiceNext().GetConnection(e.Guild)?.Dispose();
+							
+							state.Queue.Dispose();
+							state.Dispose();
+							
+							_logger.LogDebug("Left VC.");
+						}
+						catch { }
+					});
+				}
+				else
+				{
+					if (e.After is null)
+						return; // Nothing to do here. //
+					if (_watchdogs.TryGetValue(e.Guild.Id, out var watchdog))
+					{
+						_logger.LogDebug("Cancelling watchdog.");
+						watchdog.Cancel();
+						watchdog.Dispose();
+						_watchdogs.TryRemove(e.Guild.Id, out _);
+					}
+				}
+			}
+			else
+			{
+				// _lock (a SempahoreSlim) will return 0 if the lock is currently being held,
+				// which only happens when we're playing a new track *OR* if we're in the process
+				// of joining a new channel, in which case we don't want to prematurely dispose of
+				// the resources, as that could cause issues up above.
+				if (e.After?.Channel is null && _lock.CurrentCount is not 0)
+					await LeaveAsync(e.Guild.Id);
+				
+				else if ((e.Before?.IsSuppressed ?? false) && (!e.After?.IsSuppressed ?? false))
+					await PlayAsync(e.Guild.Id);
+			}
+		}
+		
+		#endregion
 		
 		public async Task<MusicPlayResult> PlayAsync(ulong guildId)
 		{
@@ -162,8 +263,30 @@ namespace Silk.Core.Services.Bot.Music
 			
 			_ = Task.Run(async () => await Task.WhenAll(yt, vn));
 		}
-
-		public void Enqueue(ulong guildId, Func<Task<MusicTrack>> fun)
+		
+		/// <summary>
+		/// Stops the and clears the queue for the specified guild. 
+		/// </summary>
+		/// <param name="guildId">The guild to stop playback on.</param>
+		/// <returns>
+		/// <para>A <see cref="MusicPlayResult"/> representing the result of stopping.</para>
+		/// <para><see cref="MusicPlayResult.InvalidChannel"/> in the event that music is not playing in that channel.</para>
+		/// <para><see cref="MusicPlayResult.QueueEmpty"/> if the queue was properly cleared.</para>
+		/// </returns>
+		public async Task<MusicPlayResult> StopAsync(ulong guildId)
+		{
+			if (!_states.TryGetValue(guildId, out var state))
+				return MusicPlayResult.InvalidChannel;
+			
+			if (state.IsPlaying)
+				state.Pause();
+			
+			state.Queue.Dispose();
+			state.Dispose();
+			return MusicPlayResult.QueueEmpty;
+		}
+		
+		public void Enqueue(ulong guildId, Func<Task<MusicTrack?>> fun)
 		{
 			if (!_states.TryGetValue(guildId, out var state))
 				return;

@@ -45,9 +45,15 @@ namespace Silk.Core.Services.Bot.Music
 		[Command]
 		[RequrieVC]
 		[Priority(2)]
-		public async Task Play(CommandContext ctx, VideoId video)
+		public async Task Play(CommandContext ctx, Video video)
 		{
 			string message;
+
+			if (ctx.Member.VoiceState.Channel != ctx.Guild.CurrentMember.VoiceState?.Channel && (ctx.Guild.CurrentMember.VoiceState?.Channel?.Users.Count() ?? 0) > 1)
+			{
+				await ctx.RespondAsync("I'm already in a VC. Sorry!");
+				return;
+			}
 			
 			VoiceResult res = await _music.JoinAsync(ctx.Member.VoiceState.Channel, ctx.Channel);
 			if (ctx.Guild.CurrentMember.VoiceState?.Channel is not null)
@@ -74,27 +80,35 @@ namespace Silk.Core.Services.Bot.Music
 
 			message = result switch
 			{
-				MusicPlayResult.NowPlaying => $"Now playing {_music.GetNowPlayingTitle(ctx.Guild.Id)}!",
+				MusicPlayResult.NowPlaying => $"Now playing {_music.GetNowPlayingTitle(ctx.Guild.Id)?.Title}!",
 				MusicPlayResult.AlreadyPlaying => "Queued 1 song.",
 				_ => $"Unexpected response {result}"
 			};
 
 			await ctx.RespondAsync(message);
 
-			async Task<MusicTrack> GetTrackAsync()
+			async Task<MusicTrack?> GetTrackAsync()
 			{
-				var manifest = await _ytClient.Videos.Streams.GetManifestAsync(video);
-				var audio = manifest.GetAudioOnlyStreams().First();
-				var stream = new LazyLoadHttpStream(_htClientFactory.CreateSilkClient(), audio.Url, audio.Size.Bytes, !Regex.IsMatch(audio.Url, "ratebypass[=/]yes") ? 9_898_989 : null);
-				var vid = await _ytClient.Videos.GetAsync(video);
-
-				return new()
+				try
 				{
-					Title = vid.Title,
-					Stream = stream,
-					Requester = ctx.User,
-					Duration = vid.Duration.Value,
-				};
+					var manifest = await _ytClient.Videos.Streams.GetManifestAsync(video.Url);
+					var audio = manifest.GetAudioOnlyStreams().FirstOrDefault() ?? manifest.Streams.FirstOrDefault();
+					
+					if (audio is null)
+						return null;
+					
+					var stream = new LazyLoadHttpStream(_htClientFactory.CreateSilkClient(), audio.Url, audio.Size.Bytes, !Regex.IsMatch(audio.Url, "ratebypass[=/]yes") ? 9_898_989 : null);
+					var vid = video;
+
+					return new()
+					{
+						Title = vid.Title,
+						Stream = stream,
+						Requester = ctx.User,
+						Duration = vid.Duration.Value,
+					};
+				}
+				catch { return null; }
 			}
 		}
 	
@@ -103,28 +117,68 @@ namespace Silk.Core.Services.Bot.Music
 		[Priority(1)]
 		public async Task Play(CommandContext ctx, IReadOnlyList<PlaylistVideo> playlist)
 		{
-			var videos = playlist.Where(p => (p.Duration ?? TimeSpan.MaxValue) < TimeSpan.FromHours(4));
-			foreach (PlaylistVideo video in videos)
-			{
-				_music.Enqueue(ctx.Guild.Id, () => GetTrackAsync(video));
-			}
+			string message;
 
-			await ctx.RespondAsync($"Queued {videos.Count()} videos.");
-			
-			async Task<MusicTrack> GetTrackAsync(PlaylistVideo video)
+			if (ctx.Member.VoiceState.Channel != ctx.Guild.CurrentMember.VoiceState?.Channel && (ctx.Guild.CurrentMember.VoiceState?.Channel?.Users.Count() ?? 0) > 1)
 			{
-				var manifest = await _ytClient.Videos.Streams.GetManifestAsync(video.Url);
-				var audio = manifest.GetAudioOnlyStreams().First();
-				var stream = new LazyLoadHttpStream(_htClientFactory.CreateSilkClient(), audio.Url, audio.Size.Bytes, !Regex.IsMatch(audio.Url, "ratebypass[=/]yes") ? 9_898_989 : null);
-				var vid = await _ytClient.Videos.GetAsync(video.Url);
-				
-				return new()
+				await ctx.RespondAsync("I'm already in a VC. Sorry!");
+				return;
+			}
+			
+			VoiceResult res = await _music.JoinAsync(ctx.Member.VoiceState.Channel, ctx.Channel);
+			if (ctx.Guild.CurrentMember.VoiceState?.Channel is not null)
+			{
+				message = res switch
 				{
-					Title = vid.Title,
-					Stream = stream,
-					Requester = ctx.User,
-					Duration = vid.Duration.Value
+					VoiceResult.Succeeded => $"Now connected to {ctx.Member.VoiceState.Channel.Mention}!",
+					VoiceResult.SameChannel => "",
+					VoiceResult.CannotUnsupress => "I'm not a stage moderator! Would you mind accepting my request to speak?",
+					VoiceResult.CouldNotJoinChannel => "Awh. I can't join that channel!",
+					VoiceResult.NonVoiceBasedChannel => "You...Don't seemt o be in a voice-based channel??",
 				};
+				
+				if (res is not VoiceResult.SameChannel)
+					await ctx.RespondAsync(message);
+			}
+			
+			if (res is (VoiceResult.CouldNotJoinChannel or VoiceResult.NonVoiceBasedChannel or VoiceResult.CannotUnsupress))
+				return;
+			
+			var videos = playlist.Where(p => (p.Duration ?? TimeSpan.MaxValue) < TimeSpan.FromHours(4));
+			
+			foreach (PlaylistVideo video in videos) 
+				_music.Enqueue(ctx.Guild.Id, () => GetTrackAsync(video));
+
+
+			var result = await _music.PlayAsync(ctx.Guild.Id);
+
+			message = result switch
+			{
+				MusicPlayResult.NowPlaying => $"Now playing {_music.GetNowPlayingTitle(ctx.Guild.Id)?.Title}!",
+				MusicPlayResult.AlreadyPlaying => $"Queued {videos.Count()} video(s).",
+				_ => $"Unexpected response {result}"
+			};
+
+			await ctx.RespondAsync(message);
+			
+			async Task<MusicTrack?> GetTrackAsync(PlaylistVideo video)
+			{
+				try
+				{
+					var manifest = await _ytClient.Videos.Streams.GetManifestAsync(video.Url);
+					var audio = manifest.GetAudioOnlyStreams().First();
+					var stream = new LazyLoadHttpStream(_htClientFactory.CreateSilkClient(), audio.Url, audio.Size.Bytes, !Regex.IsMatch(audio.Url, "ratebypass[=/]yes") ? 9_898_989 : null);
+					var vid = video;
+
+					return new()
+					{
+						Title = vid.Title,
+						Stream = stream,
+						Requester = ctx.User,
+						Duration = vid.Duration.Value,
+					};
+				}
+				catch { return null; }
 			}
 		}
 		

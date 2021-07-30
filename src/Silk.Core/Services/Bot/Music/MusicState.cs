@@ -34,7 +34,7 @@ namespace Silk.Core.Services.Bot.Music
 		private Process _ffmpeg;
 		private readonly ProcessStartInfo _ffmpegInfo = new()
 		{
-			Arguments = "-hide_banner -loglevel quiet -i - -ac 2 -f s16le -ar 48k pipe:1 ",
+			Arguments = "-hide_banner -loglevel quiet -i - -map 0:a -ac 2 -f s16le -ar 48k pipe:1 ",
 			RedirectStandardInput = true,
 			RedirectStandardOutput = true,
 			FileName =
@@ -113,7 +113,8 @@ namespace Silk.Core.Services.Bot.Music
 			_disposing = true;
 			GC.SuppressFinalize(this);
 			_cts.Dispose();
-			_ffmpeg.Dispose();
+			_ffmpeg?.Kill();
+			_ffmpeg?.Dispose();
 			Connection.Dispose();
 		}
 	}

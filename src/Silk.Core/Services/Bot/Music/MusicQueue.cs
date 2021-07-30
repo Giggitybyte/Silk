@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Silk.Core.Services.Bot.Music
 {
-	public sealed record MusicQueue
+	public sealed record MusicQueue : IDisposable
 	{
 		public MusicTrack? NowPlaying => _nowPlaying;
 		private MusicTrack? _nowPlaying;
@@ -16,9 +16,9 @@ namespace Silk.Core.Services.Bot.Music
 		
 		public int RemainingTracks => _queue.Count;
 
-		private readonly ConcurrentQueue<Lazy<Task<MusicTrack>>> _queue = new();
+		private readonly ConcurrentQueue<Lazy<Task<MusicTrack?>>> _queue = new();
 
-		public void Enqueue(Func<Task<MusicTrack>> queueFunc) => _queue.Enqueue(new(queueFunc));
+		public void Enqueue(Func<Task<MusicTrack?>> queueFunc) => _queue.Enqueue(new(queueFunc));
 
 
 		public async Task<bool> PreloadAsync()
@@ -45,11 +45,15 @@ namespace Silk.Core.Services.Bot.Music
 
 			if (dequeued)
 			{
-				_nowPlaying = await npLazy!.Value;
-				RemainingSeconds = (int)_nowPlaying.Duration.TotalSeconds;
+				_nowPlaying = await npLazy!.Value!;
+				RemainingSeconds = (int)(_nowPlaying?.Duration.TotalSeconds ?? 0);
 			}
 			
-			return dequeued;
+			return dequeued && _nowPlaying is not null;
+		}
+		public void Dispose()
+		{
+			_queue.Clear();
 		}
 	}
 }
