@@ -168,7 +168,7 @@ namespace Silk.Core.Services.Bot.Music
 					{
 						try
 						{
-							await Task.Delay(TimeSpan.FromSeconds(20), token);
+							await Task.Delay(TimeSpan.FromMinutes(2), token);
 							c.GetVoiceNext().GetConnection(e.Guild)?.Dispose();
 							
 							state.Queue.Dispose();
@@ -229,8 +229,8 @@ namespace Silk.Core.Services.Bot.Music
 				await state.ResumeAsync();
 				Task yt = state.NowPlaying!.Stream.CopyToAsync(state.InStream, state.Token);
 				Task vn = state.OutStream.CopyToAsync(vnextSink, cancellationToken: state.Token);
-			
-				_ = Task.Run(async () => await Task.WhenAll(yt, vn));
+
+				_ = Task.Run(async () => { try { await Task.WhenAll(yt, vn); } catch { } });
 			
 				return MusicPlayResult.NowPlaying;
 			}
