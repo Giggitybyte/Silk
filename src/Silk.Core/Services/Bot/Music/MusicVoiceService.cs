@@ -36,8 +36,8 @@ namespace Silk.Core.Services.Bot.Music
 			_client.VoiceStateUpdated += VoiceStateUpdated;
 		}
 		~MusicVoiceService() => _client.VoiceStateUpdated -= VoiceStateUpdated;
-		
-		
+
+		public TimeSpan GetRemainingTime(ulong guildId) => _states.TryGetValue(guildId, out var state) ? state.RemainingDuration : TimeSpan.MinValue;
 		
 		public MusicTrack? GetNowPlaying(ulong guildId)
 		{
@@ -95,8 +95,7 @@ namespace Silk.Core.Services.Bot.Music
 				try { await voiceChannel.Guild.CurrentMember.SetDeafAsync(true); }
 				catch { }
 			}
-			
-			
+
 			var connection = await vnext.ConnectAsync(voiceChannel);
 			
 			state?.Dispose();

@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dasync.Collections;
+using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
@@ -31,6 +32,20 @@ namespace Silk.Core.Services.Bot.Music
 			_music = music;
 			_ytClient = ytClient;
 			_htClientFactory = htClientFactory;
+		}
+
+		[Command]
+		public async Task NowPlaying(CommandContext ctx)
+		{
+			var np = _music.GetNowPlaying(ctx.Guild.Id);
+			if (np is null)
+			{
+				await ctx.RespondAsync("There's nothing playing.");
+			}
+			else
+			{
+				await ctx.RespondAsync($"**{np.Title}** - Requested by {ctx.User.Username} \nDuration: {np.Duration:c}, ends at {Formatter.Timestamp(_music.GetRemainingTime(ctx.Guild.Id), TimestampFormat.LongTime)}.");
+			}
 		}
 		
 		
