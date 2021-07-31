@@ -121,6 +121,7 @@ namespace Silk.Core.Services.Bot.Music
 					return new()
 					{
 						Title = vid.Title,
+						Url = vid.Url,
 						Stream = stream,
 						Requester = ctx.User,
 						Duration = vid.Duration.Value,
@@ -191,6 +192,7 @@ namespace Silk.Core.Services.Bot.Music
 					return new()
 					{
 						Title = vid.Title,
+						Url = vid.Url,
 						Stream = stream,
 						Requester = ctx.User,
 						Duration = vid.Duration.Value,

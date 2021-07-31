@@ -9,7 +9,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using DSharpPlus.VoiceNext;
 using Microsoft.Extensions.Logging;
-using YoutubeExplode;
+using Silk.Extensions.DSharpPlus;
 
 namespace Silk.Core.Services.Bot.Music
 {
@@ -23,15 +23,13 @@ namespace Silk.Core.Services.Bot.Music
 
 		private readonly SemaphoreSlim _lock = new(1);
 		
-		private readonly YoutubeClient _youtubeClient;
 		private readonly DiscordShardedClient _client;
 		private readonly ILogger<MusicVoiceService> _logger;
 		
-		public MusicVoiceService(DiscordShardedClient client, ILogger<MusicVoiceService> logger, YoutubeClient youtubeClient)
+		public MusicVoiceService(DiscordShardedClient client, ILogger<MusicVoiceService> logger)
 		{
 			_client = client;
 			_logger = logger;
-			_youtubeClient = youtubeClient;
 
 			_client.VoiceStateUpdated += VoiceStateUpdated;
 		}
@@ -60,8 +58,12 @@ namespace Silk.Core.Services.Bot.Music
 			if (!_states.TryGetValue(guildId, out var state))
 				yield break;
 
+			int count = 0;
+			
 			foreach (var lazy in state.Queue.Queue)
-				yield return await lazy.Value;
+				if (count++ < 9)
+					yield return await lazy.Value;
+				else yield break;
 		}
 
 		#region Connection API
@@ -105,7 +107,25 @@ namespace Silk.Core.Services.Bot.Music
 				CommandChannel = commandChannel
 			};
 			
-			state.TrackEnded += async (s, _) => await PlayAsync((s as MusicState)!.ConnectedChannel.Guild.Id);
+			state.TrackEnded += async (s, _) =>
+			{
+				var state = (MusicState) s!;
+				var result = await PlayAsync(state.ConnectedChannel.Guild.Id);
+
+				var builder = new DiscordMessageBuilder();
+
+				if (result is MusicPlayResult.QueueEmpty)
+					return;
+
+				var nowPlaying = state.NowPlaying!;
+				
+				builder.WithContent($"🎶 Now playing: {nowPlaying.Title} - Requested by {nowPlaying.Requester.Mention} " +
+				                    $"\nDuration {nowPlaying.Duration:c}, ends at {Formatter.Timestamp(state.RemainingDuration, TimestampFormat.LongTime)}")
+					.AddComponents(new DiscordLinkButtonComponent(nowPlaying.Url, "Open song in your browser"))
+					.WithoutMentions();
+				
+				 await state.CommandChannel.SendMessageAsync(builder);
+			};
 			
 			if (voiceChannel.Type is ChannelType.Stage)
 			{
