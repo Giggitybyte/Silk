@@ -22,6 +22,8 @@ using YoutubeExplode.Videos;
 
 namespace Silk.Core.Services.Bot.Music
 {
+	[RequireGuild]
+	[RequireMusicGuild]
 	[HelpCategory(Categories.Misc)]
 	public class MusicCommand : BaseCommandModule
 	{
