@@ -13,6 +13,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.Interactivity.Extensions;
 using Silk.Core.Types;
 using Silk.Core.Utilities.Bot;
+using Silk.Core.Utilities.HelpFormatter;
 using Silk.Core.Utilities.HttpClient;
 using Silk.Extensions.DSharpPlus;
 using YoutubeExplode;
@@ -21,6 +22,7 @@ using YoutubeExplode.Videos;
 
 namespace Silk.Core.Services.Bot.Music
 {
+	[HelpCategory(Categories.Misc)]
 	public class MusicCommand : BaseCommandModule
 	{
 		private readonly MusicVoiceService _music;

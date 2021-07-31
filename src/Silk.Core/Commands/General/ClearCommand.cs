@@ -14,7 +14,7 @@ using Silk.Shared.Constants;
 
 namespace Silk.Core.Commands.General
 {
-    [Category(Categories.Mod)]
+    [HelpCategory(Categories.Mod)]
     public class ClearCommand : BaseCommandModule
     {
         private readonly IMediator _mediator;

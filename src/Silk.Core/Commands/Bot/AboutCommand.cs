@@ -11,7 +11,7 @@ using Silk.Shared.Constants;
 
 namespace Silk.Core.Commands.Bot
 {
-    [Category(Categories.Bot)]
+    [HelpCategory(Categories.Bot)]
     public class AboutCommand : BaseCommandModule
     {
         private readonly DiscordShardedClient _client;

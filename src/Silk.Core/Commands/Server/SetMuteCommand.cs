@@ -12,7 +12,7 @@ using Silk.Extensions.DSharpPlus;
 
 namespace Silk.Core.Commands.Server
 {
-    [Category(Categories.Server)]
+    [HelpCategory(Categories.Server)]
     public class SetMuteCommand : BaseCommandModule
     {
         private readonly IMediator _mediator;

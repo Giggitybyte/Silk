@@ -17,7 +17,7 @@ using ImageFormat = System.Drawing.Imaging.ImageFormat;
 
 namespace Silk.Core.Commands.Miscellaneous
 {
-    [Category(Categories.Misc)]
+    [HelpCategory(Categories.Misc)]
     public class UserInfo : BaseCommandModule
     {
         [Command("roleinfo")]

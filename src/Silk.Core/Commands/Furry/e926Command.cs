@@ -10,7 +10,7 @@ using Silk.Core.Utilities.HelpFormatter;
 
 namespace Silk.Core.Commands.Furry
 {
-    [Category(Categories.Misc)]
+    [HelpCategory(Categories.Misc)]
     [ModuleLifespan(ModuleLifespan.Transient)]
     [Cooldown(1, 15, CooldownBucketType.User)]
     public class e926Command : eBooruBaseCommand

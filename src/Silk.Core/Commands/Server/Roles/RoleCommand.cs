@@ -12,7 +12,7 @@ using Silk.Core.Utilities.HelpFormatter;
 
 namespace Silk.Core.Commands.Server.Roles
 {
-    [Category(Categories.Server)]
+    [HelpCategory(Categories.Server)]
     public class RoleCommand : BaseCommandModule
     {
         private readonly IMediator _mediator;

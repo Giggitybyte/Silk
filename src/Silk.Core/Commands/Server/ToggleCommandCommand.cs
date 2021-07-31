@@ -14,7 +14,7 @@ using Silk.Core.Utilities.HelpFormatter;
 
 namespace Silk.Core.Commands.Server
 {
-    [Category(Categories.Server)]
+    [HelpCategory(Categories.Server)]
     public class ToggleCommandCommand : BaseCommandModule
     {
         private readonly IMediator _mediator;

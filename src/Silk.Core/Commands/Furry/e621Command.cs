@@ -13,7 +13,7 @@ using Silk.Shared.Configuration;
 
 namespace Silk.Core.Commands.Furry
 {
-    [Category(Categories.Misc)]
+    [HelpCategory(Categories.Misc)]
     [ModuleLifespan(ModuleLifespan.Transient)]
     [Cooldown(1, 10, CooldownBucketType.User)]
     public class e621Command : eBooruBaseCommand

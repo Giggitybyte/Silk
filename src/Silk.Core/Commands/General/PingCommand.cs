@@ -11,7 +11,7 @@ using Silk.Core.Utilities.HelpFormatter;
 
 namespace Silk.Core.Commands.General
 {
-    [Category(Categories.Misc)]
+    [HelpCategory(Categories.Misc)]
     public class PingCommand : BaseCommandModule
     {
         private readonly IDbContextFactory<GuildContext> _dbFactory;
