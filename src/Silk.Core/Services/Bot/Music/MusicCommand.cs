@@ -39,6 +39,7 @@ namespace Silk.Core.Services.Bot.Music
 		}
 
 		[Command]
+		[Aliases("np")]
 		public async Task NowPlaying(CommandContext ctx)
 		{
 			var np = _music.GetNowPlaying(ctx.Guild.Id);
@@ -56,6 +57,7 @@ namespace Silk.Core.Services.Bot.Music
 		[Command]
 		[RequrieVC]
 		[Priority(0)]
+		[Aliases("p")]
 		public async Task Play(CommandContext ctx)
 		{
 			var result = await _music.PlayAsync(ctx.Guild.Id);
@@ -212,6 +214,7 @@ namespace Silk.Core.Services.Bot.Music
 		public async Task Pause(CommandContext ctx) => _music.Pause(ctx.Guild.Id);
 
 		[Command]
+		[Aliases("q")]
 		public async Task Queue(CommandContext ctx)
 		{
 			if (ctx.Guild.CurrentMember.VoiceState?.Channel is null)
@@ -257,6 +260,7 @@ namespace Silk.Core.Services.Bot.Music
 
 		[Command]
 		[RequrieVC]
+		[Aliases("s")]
 		[RequrieSameVC]
 		public async Task Skip(CommandContext ctx)
 		{
