@@ -15,12 +15,12 @@ namespace Silk.Core.Utilities.HelpFormatter
 {
     public class HelpFormatter : BaseHelpFormatter
     {
-
         public HelpFormatter(CommandContext ctx) : base(ctx)
         {
             Command = null;
             Subcommands = null;
         }
+        
         public Command? Command { get; private set; }
         public Command[]? Subcommands { get; private set; }
 
@@ -35,8 +35,7 @@ namespace Silk.Core.Utilities.HelpFormatter
             Subcommands = subcommands.ToArray();
             return this;
         }
-
-
+        
         public override CommandHelpMessage Build()
         {
             DiscordEmbedBuilder embed = new DiscordEmbedBuilder().WithColor(DiscordColor.Azure);

@@ -12,12 +12,13 @@ namespace Silk.Core.Utilities.HelpFormatter
             General = "`📁 General`",
             Games = "`🎮 Games`",
             Misc = "`💡 Misc`",
+            Music = "`🎶 Music`",
             Server = "`🖥️ Server`",
             Bot = "`🤖 Bot`",
             Economy = "`💰 Economy`",
             Uncategorized = "`❓ Uncategorized`";
 
-        public static readonly IReadOnlyList<string> Order = new[] {Dev, General, Games, Misc, Mod, Server, Bot, Economy, Uncategorized};
+        public static readonly IReadOnlyList<string> Order = new[] {Dev, General, Games, Misc, Music, Mod, Server, Bot, Economy, Uncategorized};
     }
 
     public static class CustomEmoji

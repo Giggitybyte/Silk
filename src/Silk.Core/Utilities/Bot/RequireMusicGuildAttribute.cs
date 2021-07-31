@@ -11,11 +11,9 @@ namespace Silk.Core.Utilities.Bot
 	{
 		public override async Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
 		{
-			if (help)
-				return true;
 			var options = ctx.Services.Get<IOptions<SilkConfigurationOptions>>()!.Value;
 
-			return options.PrivateMusic.Contains(ctx.Guild.Id);
+			return options.PrivateMusic?.Contains(ctx.Guild.Id) ?? false;
 		}
 	}
 }

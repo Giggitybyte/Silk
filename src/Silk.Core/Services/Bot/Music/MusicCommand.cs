@@ -24,7 +24,7 @@ namespace Silk.Core.Services.Bot.Music
 {
 	[RequireGuild]
 	[RequireMusicGuild]
-	[HelpCategory(Categories.Misc)]
+	[HelpCategory(Categories.Music)]
 	public class MusicCommand : BaseCommandModule
 	{
 		private readonly MusicVoiceService _music;
