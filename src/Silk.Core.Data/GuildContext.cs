@@ -25,14 +25,16 @@ namespace Silk.Core.Data
 
         public DbSet<GuildConfig> GuildConfigs { get; set; } = null!;
 
+        public DbSet<GuildModConfig> GuildModConfigs { get; set; } = null!;
+        
         public DbSet<Tag> Tags { get; set; } = null!;
 
         public DbSet<Reminder> Reminders { get; set; } = null!;
+        
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             builder.ApplyConfigurationsFromAssembly(typeof(GuildContext).Assembly);
-            builder.Entity<SelfAssignableRole>().Property(r => r.Id).ValueGeneratedNever();
             base.OnModelCreating(builder);
         }
     }
