@@ -10,27 +10,25 @@ namespace Silk.Dashboard.Services
     public class DiscordRestClientService : IDisposable
     {
         private bool _disposed;
+
         public DiscordRestClient RestClient { get; }
 
-        public DiscordRestClientService(IDashboardTokenStorageService tokenStorageService)
-        {
-            RestClient = new DiscordRestClient(new DiscordConfiguration
-            {
-                Token = tokenStorageService.GetToken()?.AccessToken,
-                TokenType = TokenType.Bearer
-            });
-            RestClient.InitializeAsync().GetAwaiter().GetResult();
-        }
+        public DiscordRestClientService(DiscordRestClient restClient) => RestClient = restClient;
 
         public async Task<IReadOnlyList<DiscordGuild>> GetAllGuildsAsync()
-            => await RestClient.GetCurrentUserGuildsAsync(100, 0, 0);
+            => await RestClient.GetCurrentUserGuildsAsync(50, 0, 0);
 
         public async Task<IReadOnlyList<DiscordGuild>> GetGuildsByPermissionAsync(Permissions perms)
             => FilterGuildsByPermission(await GetAllGuildsAsync(), perms);
 
-        public IReadOnlyList<DiscordGuild> FilterGuildsByPermission(IReadOnlyList<DiscordGuild> guilds,
-            Permissions perms)
+        public IReadOnlyList<DiscordGuild> FilterGuildsByPermission(IReadOnlyList<DiscordGuild> guilds, Permissions perms)
             => guilds.Where(g => (g.Permissions & perms) != 0).ToList();
+
+        public async Task<DiscordGuild> GetGuildByIdAndPermissions(ulong guildId, Permissions permissions)
+        {
+            return (await GetGuildsByPermissionAsync(permissions))
+                .FirstOrDefault(g => g.Id == guildId);
+        }
 
         public void Dispose() => Dispose(true);
 

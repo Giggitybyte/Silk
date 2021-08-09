@@ -3,10 +3,10 @@
 
 @inherits ComponentBase
 
-@if (_ownedGuilds is null)
+@if (_joinedGuilds is null)
 {
-    <div class="container mt-4">
-        <Circle Size="100px" Center="true" Color="#337AB7" />
+    <div class="d-flex align-content-center justify-content-center vh-100">
+        <Circle Size="120px" Center="true" Color="#337AB7" />
     </div>
 }
 else
@@ -14,7 +14,20 @@ else
     <HeaderView ImageUrl="@CurrentUserAvatar" Text="@HeaderViewGreeting" />
 
     <div class="container">
-        <h3 class="mb-2">Servers You Manage:</h3>
+        <h3>Servers You Manage:</h3><br />
+        
         <GuildCollectionView Guilds="@_ownedGuilds" />
+        
+        <button class="btn btn-primary my-4" @onclick="ToggleJoinedGuildsVisibility">
+            @(_showJoinedGuilds ? "Hide" : "Show") Joined Servers
+        </button>
     </div>
+
+    if (_showJoinedGuilds)
+    {
+        <div class="container">
+            <h3>Servers You've Joined (not all):</h3><br />
+            <GuildCollectionView Guilds="@_joinedGuilds" />
+        </div>
+    }
 }

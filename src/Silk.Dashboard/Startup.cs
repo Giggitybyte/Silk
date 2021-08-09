@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using AspNet.Security.OAuth.Discord;
 using Blazored.Toast;
+using DSharpPlus;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -11,6 +13,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Silk.Core.Data;
 using Silk.Dashboard.Models;
@@ -40,13 +43,35 @@ namespace Silk.Dashboard
             services.AddHttpClient();
 
             services.AddScoped<IDashboardTokenStorageService, DashboardTokenStorageService>();
+            services.AddScoped(provider =>
+            {
+                var restClient = new DiscordRestClient(new DiscordConfiguration
+                {
+                    Token = provider.GetRequiredService<IDashboardTokenStorageService>().GetToken()?.AccessToken,
+                    TokenType = TokenType.Bearer
+                });
+
+                /* Todo: Calls InitializeAsync by default. Let user manually call? */
+                restClient.InitializeAsync().GetAwaiter().GetResult();
+                return restClient;
+            });
             services.AddScoped<DiscordRestClientService>();
             
             /* Todo: Consolidate Adding SilkConfigurationOptions to common location? */
             services.Configure<SilkConfigurationOptions>(Configuration.GetSection(SilkConfigurationOptions.SectionKey));
             var silkConfig = Configuration.GetSection(SilkConfigurationOptions.SectionKey).Get<SilkConfigurationOptions>();
-
-            services.AddDbContext<GuildContext>(o => o.UseNpgsql(silkConfig.Persistence.ToString()));
+            
+            services.AddDbContextFactory<GuildContext>(builder =>
+            {
+                builder.UseNpgsql(silkConfig.Persistence.GetConnectionString());
+                #if DEBUG
+                builder.EnableSensitiveDataLogging();
+                builder.EnableDetailedErrors();
+                #endif
+            }, ServiceLifetime.Transient);
+            
+            services.TryAdd(new ServiceDescriptor(typeof(GuildContext), p => 
+                p.GetRequiredService<IDbContextFactory<GuildContext>>().CreateDbContext(), ServiceLifetime.Transient));
 
             services.AddMediatR(typeof(GuildContext));
 

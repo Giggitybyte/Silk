@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Blazored.Toast.Services;
 using DSharpPlus;
@@ -15,90 +14,75 @@ namespace Silk.Dashboard.Pages.Dashboard
 {
     public partial class ManageGuild : ComponentBase
     {
-        [Inject] private DiscordRestClientService RestClientService { get; set; }
-        [Inject] private NavigationManager NavigationManager { get; set; }
         [Inject] private IMediator Mediator { get; set; }
         [Inject] private IToastService ToastService { get; set; }
+        [Inject] private DiscordRestClientService RestClientService { get; set; }
 
         [Parameter] public string GuildId { get; set; }
+        public ulong GuildIdParsed => ulong.Parse(GuildId);
 
         private readonly GreetingOption[] _greetingOptions = Enum.GetValues<GreetingOption>();
 
+        private bool _requestFailed;
+        
         private DiscordGuild _guild;
-        private GuildConfig _config;
+        private GuildConfig _guildConfig;
 
         protected override async Task OnInitializedAsync()
         {
-            _guild = (await RestClientService.GetGuildsByPermissionAsync(Permissions.ManageGuild))
-                .FirstOrDefault(g => g.Id == ulong.Parse(GuildId));
+            _guildConfig = await GetGuildConfig();
+        }
 
-            if (_guild is null)
+        private async Task<GuildConfig> GetGuildConfig()
+        {
+            GuildConfig guildConfig = null;
+
+            try
             {
-                NavigationManager.NavigateTo("/Dashboard/Profile");
+                _guild = await RestClientService.GetGuildByIdAndPermissions(GuildIdParsed, Permissions.ManageGuild);
+
+                if (_guild is null)
+                {
+                    /* Todo: Handle this differently */
+                    throw new Exception("The Guild requested was either unavailable or the request failed");
+                }
+
+                GuildConfig configResponse = await Mediator.Send<GuildConfig>(new GetGuildConfigRequest(GuildIdParsed));
+                guildConfig = configResponse ?? (await GetOrCreateNewGuild()).Configuration;
+
+                _requestFailed = false;
             }
-            else
+            catch (Exception e)
             {
-                GuildConfig configResponse = await Mediator.Send<GuildConfig>(new GetGuildConfigRequest(_guild.Id));
-                if (configResponse is null)
-                {
-                    var guild = await GetOrCreateNewGuild();
-                    _config = guild.Configuration;
-                }
-                else
-                {
-                    _config = configResponse;
-                }
+                _requestFailed = true;
             }
+
+            return guildConfig;
         }
 
         private async Task<Guild> GetOrCreateNewGuild()
         {
-            return await Mediator.Send(new GetOrCreateGuildRequest(ulong.Parse(this.GuildId), StringConstants.DefaultCommandPrefix));
-        }
-
-        private UpdateGuildConfigRequest CompleteUpdateGuildConfigRequest()
-        {
-            var guildId = ulong.Parse(this.GuildId);
-            _config.GuildId = guildId;
-
-            // TODO: Refactor or use/unify logic from UpdateGuildConfigRequest
-            return new UpdateGuildConfigRequest(guildId)
-            {
-                MuteRoleId = _config.MuteRoleId,
-                GreetingOption = _config.GreetingOption,
-                LoggingChannel = _config.LoggingChannel,
-                GreetingChannelId = _config.GreetingChannel,
-                VerificationRoleId = _config.VerificationRole,
-
-                ScanInvites = _config.ScanInvites,
-                BlacklistWords = _config.BlacklistWords,
-                BlacklistInvites = _config.BlacklistInvites,
-                LogMembersJoining = _config.LogMemberJoins,
-                UseAggressiveRegex = _config.UseAggressiveRegex,
-                WarnOnMatchedInvite = _config.WarnOnMatchedInvite,
-                DeleteOnMatchedInvite = _config.DeleteMessageOnMatchedInvite,
-                GreetOnVerificationRole = _config.GreetOnVerificationRole,
-                GreetOnScreeningComplete = _config.GreetOnVerificationRole,
-
-                MaxUserMentions = _config.MaxUserMentions,
-                MaxRoleMentions = _config.MaxRoleMentions,
-
-                GreetingText = _config.GreetingText,
-
-                InfractionSteps = _config.InfractionSteps,
-                AllowedInvites = _config.AllowedInvites,
-                DisabledCommands = _config.DisabledCommands,
-                SelfAssignableRoles = _config.SelfAssignableRoles
-            };
+            return await Mediator.Send(new GetOrCreateGuildRequest(GuildIdParsed,
+                StringConstants.DefaultCommandPrefix));
         }
 
         private async Task SaveChangesAsync()
         {
-            var updated = await Mediator.Send(CompleteUpdateGuildConfigRequest());
+            var request = new UpdateGuildConfigRequest(GuildIdParsed)
+            {
+                GreetingOption = _guildConfig.GreetingOption,
+                GreetingChannelId = _guildConfig.GreetingChannel,
+                VerificationRoleId = _guildConfig.VerificationRole,
+                GreetOnScreeningComplete = _guildConfig.GreetingOption is GreetingOption.GreetOnScreening,
+                GreetingText = _guildConfig.GreetingText,
+                DisabledCommands = _guildConfig.DisabledCommands
+            };
+
+            GuildConfig updated = await Mediator.Send(request);
             if (updated is not null)
             {
                 ToastService.ShowSuccess("Successfully saved config!");
-                _config = updated;
+                _guildConfig = updated;
             }
             else
             {

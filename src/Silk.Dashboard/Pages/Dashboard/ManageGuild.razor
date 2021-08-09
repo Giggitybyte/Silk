@@ -5,47 +5,43 @@
 @inherits ComponentBase
 
 @* 
-TODO: 1. Split file into code-behind; 2. Add rest of properties in Model as view fields; 3. Clean up / refactor
+TODO: 1. Make or add Tabs for Moderation section. 2. Style things/make it look better 😭
 *@
 
-@if (_guild is null)
+@if (_guildConfig is null && _requestFailed is false)
 {
-    <div class="container mt-4">
-        <Circle Size="100px" Center="true" Color="#337AB7" />
+    <div class="d-flex align-content-center justify-content-center vh-100">
+        <Circle Size="120px" Center="true" Color="#337AB7" />
+    </div>
+}
+else if (_guildConfig is null && _requestFailed)
+{
+    /* Todo: Center div vertically */
+    <div class="d-flex align-content-center justify-content-center vh-100">
+        <div class="container text-center">
+            <h1>Uh Oh! 😓</h1>
+            <h3>
+                Looks like either the Guild you requested isn't available or the request failed.
+                Please refresh the page to try again.
+            </h3>
+        </div>
     </div>
 }
 else
 {
     <div class="jumbotron mb-3 p-4">
         <HeaderView ImageUrl="@_guild.IconUrl" Text="@_guild.Name" />
+        
         <div class="container">
-            <EditForm Model="@_config" OnValidSubmit="@SaveChangesAsync">
+            <EditForm Model="@_guildConfig" OnValidSubmit="@SaveChangesAsync">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
 
-                <div class="form-group mb-3">
-                    <label class="mb-1" for="MuteRoleId">Mute Role Id</label> <br />
-                    <input type="number"
-                           class="input-group-text bg-white"
-                           id="MuteRoleId"
-                           @bind-value="_config.MuteRoleId"
-                           @bind-value:event="oninput" />
-                </div>
-
-                <div class="form-group mb-3">
-                    <label class="mb-1" for="GreetingChannel">Greeting Channel Id</label> <br />
-                    <input type="number"
-                           class="input-group-text bg-white"
-                           id="GreetingChannel"
-                           @bind-value="_config.GreetingChannel"
-                           @bind-value:event="oninput" />
-                </div>
-
                 <div class="form-group mb-2">
-                    <label for="GreetMembers">Greet Members</label>
-                    
+                    <label>Greet Members</label>
+
                     @* Todo: Stylize Select component *@
-                    <select class="form-select" @bind="_config.GreetingOption">
+                    <select class="form-select" @bind="_guildConfig.GreetingOption">
                         @foreach (var go in _greetingOptions)
                         {
                             @* Todo: Add Description attribute to Enum *@
@@ -55,18 +51,35 @@ else
                 </div>
 
                 <div class="form-group mb-3">
+                    <label class="mb-1" for="GreetingChannel">Greeting Channel Id</label><br/>
+                    <input type="number"
+                           class="input-group-text bg-white"
+                           id="GreetingChannel"
+                           @bind-value="_guildConfig.GreetingChannel"
+                           @bind-value:event="oninput" />
+                </div>
+                
+                <div class="form-group mb-3">
                     <label class="mb-1" for="GreetingText">Greeting Text</label> <br />
+                    <div class="container">
+                        <span class="text-warning">Note: </span><br />
+                        <ul>
+                            <li><span class="text-info">{u}</span> Will get replaced with the member's username</li>
+                            <li><span class="text-info">{s}</span> Will get replaced with the Guild's name</li>
+                            <li><span class="text-info">{@@u}</span> Will get replaced with the member's mention</li>
+                        </ul>
+                    </div>
                     <textarea id="GreetingText" class="form-control" rows="2"
-                              placeholder="Welcome {@@u}! This is {@@s}, the best server around!"
-                              @bind-value="_config.GreetingText"
+                              placeholder="Welcome {@@u}! This is {s}, the best server around!"
+                              @bind-value="_guildConfig.GreetingText"
                               @bind-value:event="oninput"></textarea>
                 </div>
 
-                @if (_guild.Features.Contains("MEMBER_VERIFICATION_GATE_ENABLED"))
+                @if (_guild.Features.Contains("MEMBER_VERIFICATION_GATE_ENABLED") && 
+                     _guildConfig.GreetingOption is GreetingOption.GreetOnScreening)
                 {
                     <div class="form-group mb-2">
-                        <label for="GreetOnScreeningComplete">Greet On Screening Complete</label>
-                        <InputCheckbox id="GreetOnScreeningComplete" @bind-Value="_config.GreetOnScreeningComplete" />
+                        <label>Greeting When Screening Complete is Enabled!</label>
                     </div>
                 }
 
@@ -75,36 +88,12 @@ else
                     <input type="number"
                            class="input-group-text bg-white"
                            id="VerificationRole"
-                           @bind-value="_config.VerificationRole"
+                           @bind-value="_guildConfig.VerificationRole"
                            @bind-value:event="oninput" />
-                </div>
-
-                <div class="form-group mb-2">
-                    <label for="GreetOnVerificationRole">Greet On Verification Role</label>
-                    <InputCheckbox id="GreetOnVerificationRole" @bind-Value="_config.GreetOnVerificationRole" />
-                </div>
-
-                <div class="form-group mb-3">
-                    <label class="mb-1" for="InfractionFormat">Infraction Format</label> <br />
-                    <textarea id="InfractionFormat" class="form-control" rows="2"
-                              @bind-value="_config.InfractionFormat"
-                              @bind-value:event="oninput"></textarea>
                 </div>
 
                 <button type="submit" class="btn btn-primary mt-2">Save Changes</button>
             </EditForm>
         </div>
     </div>
-
-    <style>
-        input[type=number]::-webkit-outer-spin-button,
-        input[type=number]::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        
-        input[type=number] {
-            -moz-appearance:textfield;
-        }
-    </style>
 }
