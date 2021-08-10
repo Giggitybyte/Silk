@@ -23,19 +23,20 @@ using Silk.Shared.Constants;
 
 namespace Silk.Core.Commands
 {
+	[RequireGuild]
 	[Group("config")]
 	[RequireFlag(UserFlag.Staff)]
 	[Description("View and edit configuration for the current guild.")]
-	public class TestConfigModule : BaseCommandModule
+	public class ConfigModule : BaseCommandModule
 	{
 		private readonly ICacheUpdaterService _updater;
-		public TestConfigModule(ICacheUpdaterService updater) => _updater = updater;
+		public ConfigModule(ICacheUpdaterService updater) => _updater = updater;
 
 		[Command]
 		[Description("Reloads the config from the database. May temporarily slow down response time. (Configs are automatically reloaded every 10 minutes!)")]
 		public async Task Reload(CommandContext ctx)
 		{
-			var res = await TestEditConfigModule.GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+			var res = await EditConfigModule.GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
 
 			if (!res) return;
 			
@@ -55,7 +56,6 @@ namespace Silk.Core.Commands
 
 			private string GetCountString(int count) => count is 0 ? "Not set/enabled" : count.ToString();
 
-
 			[GroupCommand]
 			[Description("View the current config.")]
 			public async Task View(CommandContext ctx)
@@ -65,45 +65,57 @@ namespace Silk.Core.Commands
 
 				var embed = new DiscordEmbedBuilder();
 				var contentBuilder = new StringBuilder();
-
+				
 				contentBuilder
 					.Clear()
 					.AppendLine("**General Config:**")
-					.AppendLine("__Greeting:__ ")
+					.AppendLine("__Greeting:__")
 					.AppendLine($"> Option: {config.GreetingOption.Humanize()}")
 					.AppendLine($"> Greetting channel {(config.GreetingOption is GreetingOption.DoNotGreet ? "N/A" : $"<#{config.GreetingChannel}>")}")
 					.AppendLine($"> Greeting text: {(config.GreetingOption is GreetingOption.DoNotGreet ? "N/A" : $"[See {ctx.Prefix}config view greeting]")}")
 					.AppendLine()
 					.AppendLine()
 					.AppendLine("**Moderation Config:**")
+					.AppendLine()
+					.AppendLine("__Logging:__")
+					.AppendLine($"> Channel: {(modConfig.LoggingChannel is var channel and not 0 ? $"<#{channel}>" : "Not set")}")
+					.AppendLine($"> Log members joining: <:_:{(modConfig.LogMemberJoins ? Emojis.ConfirmId : Emojis.DeclineId)}>")
+					.AppendLine($"> Log members leaving: <:_:{(modConfig.LogMemberLeaves ? Emojis.ConfirmId : Emojis.DeclineId)}>")
+					.AppendLine($"> Log message edits/deletions: <:_:{(modConfig.LogMessageChanges ? Emojis.ConfirmId : Emojis.DeclineId)}>")
+					.AppendLine()
 					.AppendLine($"Max role mentions: {GetCountString(modConfig.MaxRoleMentions)}")
 					.AppendLine($"Max user mentions: {GetCountString(modConfig.MaxUserMentions)}")
-					.AppendLine()
-					.AppendLine($"Mute role: {(modConfig.MuteRoleId is 0 ? "Not set" : $"<@&{modConfig.MuteRoleId}>")}")
-					.AppendLine($"Logging channel: {(modConfig.LoggingChannel is var count and not 0 ? $"<#{count}>" : "Not set")}")
 					.AppendLine()
 					.AppendLine("__Invites:__")
 					.AppendLine($"> Scan invite: <:_:{(modConfig.ScanInvites ? Emojis.ConfirmId : Emojis.DeclineId)}>")
 					.AppendLine($"> Infract on invite: <:_:{(modConfig.WarnOnMatchedInvite ? Emojis.ConfirmId : Emojis.DeclineId)}>")
 					.AppendLine($"> Delete matched invite: <:_:{(modConfig.DeleteMessageOnMatchedInvite ? Emojis.ConfirmId : Emojis.DeclineId)}>")
-					.AppendLine($@"> Use agressive invite matching: <:_:{(modConfig.UseAggressiveRegex ? Emojis.ConfirmId : Emojis.DeclineId)}>>>")
+					.AppendLine($@"> Use agressive invite matching: <:_:{(modConfig.UseAggressiveRegex ? Emojis.ConfirmId : Emojis.DeclineId)}>")
 					.AppendLine($"> Allowed invites: {(modConfig.AllowedInvites.Count is 0 ? "None" : $"{modConfig.AllowedInvites.Count} allowed invites [See {ctx.Prefix}config view invites]")}")
 					.AppendLine("Aggressive pattern matching regex:")
 					.AppendLine(@"`disc((ord)?(((app)?\.com\/invite)|(\.gg)))\/([A-z0-9-_]{2,})`")
 					.AppendLine()
 					.AppendLine("__Infractions:__")
+					.AppendLine($"> Mute role: {(modConfig.MuteRoleId is 0 ? "Not set" : $"<@&{modConfig.MuteRoleId}>")}")
 					.AppendLine($"> Infraction steps: {(modConfig.InfractionSteps.Count is var dictCount and not 0 ? $"{dictCount} steps [See {ctx.Prefix}config view infractions]" : "Not configured")}")
 					.AppendLine($"> Infraction steps (named): {((modConfig.NamedInfractionSteps?.Count ?? 0) is var infNameCount and not 0 ? $"{infNameCount} steps [See {ctx.Prefix}config view infractions]" : "Not configured")}")
 					.AppendLine($"> Auto-escalate automod infractions: <:_:{(modConfig.AutoEscalateInfractions ? Emojis.ConfirmId : Emojis.DeclineId)}>");
-
+				
 				embed
 					.WithTitle($"Configuration for {ctx.Guild.Name}:")
 					.WithColor(DiscordColor.Azure)
 					.WithDescription(contentBuilder.ToString());
-
+				
 				await ctx.RespondAsync(embed);
 			}
-
+			
+			// Justification for ommiting a Log command in the View group:			//
+			// The commands below exist because they house complex information		//
+			// that would otherwise bloat the main embed to > 4096 characters,		//
+			// which is the limit for embed descriptions. Log however only houses	//
+			// A few booleans, and thus does not need it's own command in the view	//
+			// group.																//
+			
 			[Command]
 			[Description("View in-depth greeting-related config.")]
 			public async Task Greeting(CommandContext ctx)
@@ -213,7 +225,7 @@ namespace Silk.Core.Commands
 		}
 
 		[Group("edit")]
-		public sealed class TestEditConfigModule : BaseCommandModule
+		public sealed class EditConfigModule : BaseCommandModule
 		{
 			// Someone's gonna chew me a new one with this many statics lmao //
 			private static readonly DiscordButtonComponent _yesButton = new(ButtonStyle.Success, "confirm action", null, false, new(Emojis.ConfirmId));
@@ -227,46 +239,45 @@ namespace Silk.Core.Commands
 
 			private readonly IMediator _mediator;
 			private static readonly ConcurrentDictionary<ulong, CancellationTokenSource> _tokens = new();
-			public TestEditConfigModule(IMediator mediator) => _mediator = mediator;
+			public EditConfigModule(IMediator mediator) => _mediator = mediator;
 			
-
-			[Group("log")]
-			public sealed class TestEditLogModule : BaseCommandModule
+			
+			[Command]
+			[Description("Edit the mute role to give to members when muting. If this isn't configured, one will be generated as necessary.")]
+			public async Task Mute(CommandContext ctx, DiscordRole role)
 			{
-				private readonly IMediator _mediator;
-				public TestEditLogModule(IMediator mediator) => _mediator = mediator;
-				
-				[Command]
-				[Description("Edit the channel I logs infractions, users, etc to!")]
-				public async Task Channel(CommandContext ctx, DiscordChannel channel)
+				var notMuteRole = role.Permissions.HasPermission(Permissions.SendMessages);
+				var canChangeMuteRole = ctx.Guild.CurrentMember.HasPermission(Permissions.ManageRoles);
+				var roleTooHigh = ctx.Guild.CurrentMember.Roles.Max(r => r.Position) <= role.Position;
+
+				if (notMuteRole)
 				{
-					if (!channel.PermissionsFor(ctx.Guild.CurrentMember).HasPermission(FlagConstants.LoggingPermissions))
+					var msg = (canChangeMuteRole, roleTooHigh) switch
 					{
-						await ctx.RespondAsync($"I don't have proper permissions to log there! I need {FlagConstants.LoggingPermissions.ToPermissionString()}");
+						(true, false) => "",
+						(true, true) => "That role is too high and has permission to send messages! Please fix this and try again.",
+						(false, true) => "I don't have permission to edit this role, and it has permission to send messages! Please fix this and try again.",
+						(false, false) => "This role has permission to send messages, and I can't edit it. Please fix this and try again."
+					};
+
+					if (!canChangeMuteRole || roleTooHigh)
+					{
+						await ctx.RespondAsync(msg);
 						return;
 					}
-				
-					EnsureCancellationTokenCancellation(ctx.User.Id);
-				
-					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
-
-					if (!res) return;
-
-					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { LoggingChannel = channel.Id });
+					else
+					{
+						await role.ModifyAsync(m => m.Permissions = role.Permissions ^ Permissions.SendMessages);
+					}
 				}
+					
+				EnsureCancellationTokenCancellation(ctx.User.Id);
 
-				[Command]
-				[Description("Edit whether or not I log members that join and leave")]
-				public async Task Members(CommandContext ctx, bool log)
-				{
-					EnsureCancellationTokenCancellation(ctx.User.Id);
+				var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
 
-					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+				if (!res) return;
 
-					if (!res) return;
-
-					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { LogMembersJoining = log });
-				}
+				await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { MuteRoleId = role.Id });
 			}
 			
 			[Command]
@@ -297,7 +308,6 @@ namespace Silk.Core.Commands
 
 				await _mediator.Send(new UpdateGuildConfigRequest(ctx.Guild.Id) { GreetingOption = parsedOption });
 			}
-
 
 			[Command]
 			[Aliases("greeting-channel", "welcomechannel", "welcome-channel", "gc", "wc")]
@@ -345,6 +355,77 @@ namespace Silk.Core.Commands
 				await _mediator.Send(new UpdateGuildConfigRequest(ctx.Guild.Id) { GreetingText = message });
 			}
 			
+			
+			[Group("log")]
+			public sealed class EditLogModule : BaseCommandModule
+			{
+				private readonly IMediator _mediator;
+				public EditLogModule(IMediator mediator) => _mediator = mediator;
+				
+				[Command]
+				[Description("Edit the channel I logs infractions, users, etc to!")]
+				public async Task Channel(CommandContext ctx, DiscordChannel channel)
+				{
+					if (!channel.PermissionsFor(ctx.Guild.CurrentMember).HasPermission(FlagConstants.LoggingPermissions))
+					{
+						await ctx.RespondAsync($"I don't have proper permissions to log there! I need {FlagConstants.LoggingPermissions.ToPermissionString()}");
+						return;
+					}
+				
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+				
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { LoggingChannel = channel.Id });
+				}
+				
+				[Command("member-joins")]
+				[Aliases("members-joining", "mj")]
+				[Description("Edit whether or not I log members that join")]
+				public async Task MembersJoin(CommandContext ctx, bool log)
+				{
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { LogMembersJoining = log });
+				}
+				
+				[Command("member-leaves")]
+				[Aliases("members-leaving", "ml")]
+				[Description("Edit whether or not I log members that leave")]
+				public async Task MembersLeave(CommandContext ctx, bool log)
+				{
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { LogMembersLeaving = log });
+				}
+
+				[Command("message-edits")]
+				[Description("Whether or not I log message edits and deletions. Requires a log channel to be set.")]
+				public async Task MessageEdits(CommandContext ctx, bool log)
+				{
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { LogMessageChanges = log });
+				}
+				
+			}
+			
+			
+			
 			/// <summary>
 			/// Waits indefinitely for user confirmation unless the associated token is cancelled.
 			/// </summary>
@@ -384,7 +465,6 @@ namespace Silk.Core.Commands
 					return false;
 				}
 			}
-
 			
 			/// <summary>
 			/// Cancels and removes the token with the specified id if it exists.

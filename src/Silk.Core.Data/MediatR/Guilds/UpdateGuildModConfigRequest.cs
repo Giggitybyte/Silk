@@ -16,6 +16,7 @@ namespace Silk.Core.Data.MediatR.Guilds
 		public bool? BlacklistWords { get; init; }
 		public bool? BlacklistInvites { get; init; }
 		public bool? LogMembersJoining { get; init; }
+		public bool? LogMembersLeaving { get; init; }
 		public bool? UseAggressiveRegex { get; init; }
 		public bool? WarnOnMatchedInvite { get; init; }
 		public bool? DeleteOnMatchedInvite { get; init; }
@@ -25,6 +26,7 @@ namespace Silk.Core.Data.MediatR.Guilds
 		public List<InfractionStep>? InfractionSteps { get; init; }
 		public ulong? MuteRoleId { get; init; }
 		public ulong? LoggingChannel { get; init; }
+		public bool? LogMessageChanges { get; init; }
 	}
 	
 	public sealed class UpdateGuildModConfigHandler : IRequestHandler<UpdateGuildModConfigRequest>
@@ -38,6 +40,7 @@ namespace Silk.Core.Data.MediatR.Guilds
 				.FirstAsync(g => g.GuildId == request.GuildId, cancellationToken);
 			
 			config.MuteRoleId = request.MuteRoleId ?? config.MuteRoleId;
+			config.LogMessageChanges = request.LogMessageChanges ?? config.LogMessageChanges;
 			config.MaxUserMentions = request.MaxUserMentions ?? config.MaxUserMentions;
 			config.MaxRoleMentions = request.MaxRoleMentions ?? config.MaxRoleMentions;
 			config.InfractionSteps = request.InfractionSteps ?? config.InfractionSteps;
@@ -47,6 +50,7 @@ namespace Silk.Core.Data.MediatR.Guilds
 			config.BlacklistWords = request.BlacklistWords ?? config.BlacklistWords;
 			config.BlacklistInvites = request.BlacklistInvites ?? config.BlacklistInvites;
 			config.LogMemberJoins = request.LogMembersJoining ?? config.LogMemberJoins;
+			config.LogMemberLeaves = request.LogMembersLeaving ?? config.LogMemberLeaves;
 			config.UseAggressiveRegex = request.UseAggressiveRegex ?? config.UseAggressiveRegex;
 			config.WarnOnMatchedInvite = request.WarnOnMatchedInvite ?? config.WarnOnMatchedInvite;
 			config.DeleteMessageOnMatchedInvite = request.DeleteOnMatchedInvite ?? config.DeleteMessageOnMatchedInvite;
