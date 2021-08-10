@@ -49,6 +49,7 @@ namespace Silk.Core.Commands
 			ctx.CommandsNext.ExecuteCommandAsync(ctx.CommandsNext.CreateContext(ctx.Message, ctx.Prefix, ctx.CommandsNext.RegisteredCommands["config view"]));
 		
 		[Group("view")]
+		[Description("View the current config, or specify a sub-command to see detailed information.")]
 		public sealed class ViewConfigModule : BaseCommandModule
 		{
 			private readonly IMediator _mediator;
@@ -225,6 +226,7 @@ namespace Silk.Core.Commands
 		}
 
 		[Group("edit")]
+		[Description("Edit various settings through these commands:")]
 		public sealed class EditConfigModule : BaseCommandModule
 		{
 			// Someone's gonna chew me a new one with this many statics lmao //
@@ -278,6 +280,15 @@ namespace Silk.Core.Commands
 				if (!res) return;
 
 				await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { MuteRoleId = role.Id });
+			}
+
+
+			[Command]
+			[Aliases("mum", "max_user_mentions", "max-user-mentions")]
+			[Description("Edit the maximum amount of user mentions allowed in a single message. Set to 0 to disable.")]
+			public async Task MaxUserMentions(CommandContext ctx, uint mentions)
+			{
+				
 			}
 			
 			[Command]
@@ -354,9 +365,197 @@ namespace Silk.Core.Commands
 
 				await _mediator.Send(new UpdateGuildConfigRequest(ctx.Guild.Id) { GreetingText = message });
 			}
-			
-			
+
+			[Group("invite")]
+			[Aliases("invites", "inv")]
+			[Description("Invite related settings.")]
+			public sealed class EditInviteModule : BaseCommandModule
+			{
+				private readonly IMediator _mediator;
+				public EditInviteModule(IMediator mediator) => _mediator = mediator;
+
+				[Group("whitelist")]
+				[Description("Invite whitelist related settings.")]
+				public sealed class EditInviteWhitelistModule : BaseCommandModule
+				{
+					private readonly IMediator _mediator;
+					public EditInviteWhitelistModule(IMediator mediator) => _mediator = mediator;
+
+					[Command]
+					public async Task Add(CommandContext ctx, string invite)
+					{
+						DiscordInvite inviteObj;
+						try
+						{
+							inviteObj = await ctx.Client.GetInviteByCodeAsync(invite.Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Last());
+						}
+						catch
+						{
+							await ctx.RespondAsync("That doesn't appear to be a valid invite, sorry!");
+							return;
+						}
+
+						if (inviteObj.Guild.Id == ctx.Guild.Id)
+						{
+							await ctx.RespondAsync("Don't worry, invites from your server are automatically whitelisted!");
+							return;
+						}
+
+						if (inviteObj.IsRevoked || inviteObj.MaxAge < 0)
+						{
+							await ctx.RespondAsync("That invite is expired!");
+							return;
+						}
+
+						EnsureCancellationTokenCancellation(ctx.User.Id);
+
+						if (inviteObj.Guild.VanityUrlCode is null || inviteObj.Guild.VanityUrlCode != inviteObj.Code)
+							await ctx.RespondAsync(":warning: Warning, this code is not a vanity code!");
+
+						var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+						if (!res) return;
+
+						var config = await _mediator.Send(new GetGuildModConfigRequest(ctx.Guild.Id));
+						config.AllowedInvites.Add(new() { GuildId = ctx.Guild.Id, VanityURL = inviteObj.Guild.VanityUrlCode ?? inviteObj.Code });
+
+						await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { AllowedInvites = config.AllowedInvites });
+					}
+
+					[Command]
+					public async Task Remove(CommandContext ctx, string invite)
+					{
+						DiscordInvite inviteObj;
+						try
+						{
+							inviteObj = await ctx.Client.GetInviteByCodeAsync(invite.Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Last());
+						}
+						catch
+						{
+							await ctx.RespondAsync("That doesn't appear to be a valid invite, sorry!");
+							return;
+						}
+
+						if (inviteObj.Guild.Id == ctx.Guild.Id)
+						{
+							await ctx.RespondAsync("Don't worry, invites from your server are automatically whitelisted!");
+							return;
+						}
+
+						EnsureCancellationTokenCancellation(ctx.User.Id);
+
+						var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+						if (!res) return;
+
+						var config = await _mediator.Send(new GetGuildModConfigRequest(ctx.Guild.Id));
+
+						var inv = config.AllowedInvites.SingleOrDefault(i => i.VanityURL == inviteObj.Code);
+
+						if (inv is null) return;
+
+						config.AllowedInvites.Remove(new() { GuildId = ctx.Guild.Id, VanityURL = inviteObj.Guild.VanityUrlCode ?? inviteObj.Code });
+
+						await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { AllowedInvites = config.AllowedInvites });
+					}
+
+					[Command]
+					[RequireFlag(UserFlag.EscalatedStaff)]
+					public async Task Clear(CommandContext ctx)
+					{
+						EnsureCancellationTokenCancellation(ctx.User.Id);
+
+						var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+						if (!res) return;
+
+						await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { AllowedInvites = Array.Empty<Invite>().ToList() });
+					}
+
+					[Command]
+					public async Task Enable(CommandContext ctx)
+					{
+						EnsureCancellationTokenCancellation(ctx.User.Id);
+
+						var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+						if (!res) return;
+
+						await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { BlacklistInvites = true });
+					}
+
+					[Command]
+					public async Task Disable(CommandContext ctx)
+					{
+						EnsureCancellationTokenCancellation(ctx.User.Id);
+
+						var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+						if (!res) return;
+
+						await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { BlacklistInvites = false });
+					}
+				}
+
+				[Command]
+				[Aliases("so", "scan")]
+				[Description("Whether or not an effort should be made to check the origin of an invite before taking action. \nLow impact to AutoMod latency.")]
+				public async Task ScanOrigin(CommandContext ctx, bool scan)
+				{
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { ScanInvites = scan });
+				}
+
+				[Command]
+				[Aliases("warn", "wom")]
+				[Description("Whether members should be warned for sending non-whitelisted invites. \nIf `auto-esclate-infractions` is set to true, the configured auto-mod setting will be used, else it will fallback to the configured infraction step depending on the user's current infraction count.")]
+				public async Task WarnOnMatch(CommandContext ctx, bool warn)
+				{
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { WarnOnMatchedInvite = warn});
+				}
+
+				[Command]
+				[Aliases("dom", "delete")]
+				[Description("Whether or not invites will be deleted when they're detected in messages.")]
+				public async Task DeleteOnMatch(CommandContext ctx, bool delete)
+				{
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { DeleteOnMatchedInvite = delete});
+				}
+
+				[Command]
+				[Aliases("ma")]
+				[Description("Whether or not to use the aggressive invite matching regex. \n`disc((ord)?(((app)?\\.com\\/invite)|(\\.gg)))\\/([A-z0-9-_]{2,})`")]
+				public async Task MatchAggressively(CommandContext ctx, bool match)
+				{
+					EnsureCancellationTokenCancellation(ctx.User.Id);
+
+					var res = await GetButtonConfirmationUserInputAsync(ctx.User, ctx.Channel);
+
+					if (!res) return;
+
+					await _mediator.Send(new UpdateGuildModConfigRequest(ctx.Guild.Id) { UseAggressiveRegex = match});
+				}
+			}
+
 			[Group("log")]
+			[Description("Logging related settings.")]
 			public sealed class EditLogModule : BaseCommandModule
 			{
 				private readonly IMediator _mediator;
@@ -423,9 +622,7 @@ namespace Silk.Core.Commands
 				}
 				
 			}
-			
-			
-			
+
 			/// <summary>
 			/// Waits indefinitely for user confirmation unless the associated token is cancelled.
 			/// </summary>
