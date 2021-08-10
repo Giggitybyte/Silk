@@ -48,7 +48,7 @@ namespace Silk.Dashboard.Pages.Dashboard
                 if (_guild is null)
                 {
                     /* Todo: Handle this differently? */
-                    throw new Exception("The Guild requested was either unavailable or the request failed");
+                    throw new Exception("The guild requested was either unavailable or the request failed");
                 }
 
                 GuildConfig configResponse = await Mediator.Send<GuildConfig>(new GetGuildConfigRequest(GuildIdParsed));
