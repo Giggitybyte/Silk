@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using Blazored.Toast.Services;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using Microsoft.AspNetCore.Components;
@@ -7,9 +8,10 @@ using Silk.Dashboard.Services;
 
 namespace Silk.Dashboard.Pages.Dashboard
 {
-    /* Todo: Change handling of GuildViews which are not UserGuilds (i.e AllGuilds: will cause the ManageGuild page to error) */
     public partial class Profile : ComponentBase
     {
+        [Inject] public IToastService ToastService { get; set; }
+        [Inject] private NavigationManager NavigationManager { get; set; }
         [Inject] private DiscordRestClientService RestClientService { get; set; }
 
         private bool _showJoinedGuilds;
@@ -28,5 +30,18 @@ namespace Silk.Dashboard.Pages.Dashboard
         private string HeaderViewGreeting => $"Hello, {CurrentUserName}";
 
         private void ToggleJoinedGuildsVisibility() => _showJoinedGuilds = !_showJoinedGuilds;
+
+        private void HandleGuildNavigation(DiscordGuild guild, bool canNavigate)
+        {
+            var navUrl = $"/Dashboard/ManageGuild/{guild.Id}";
+            if (!canNavigate)
+            {
+                ToastService.ShowInfo("Please ask an admin or moderator to" +
+                                      " invite the bot to the desired server 🙂", "Missing Permissions");
+                return;
+            }
+            
+            NavigationManager.NavigateTo(navUrl);
+        }
     }
 }

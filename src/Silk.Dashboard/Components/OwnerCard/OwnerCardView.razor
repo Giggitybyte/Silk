@@ -2,17 +2,15 @@
 
 @using Silk.Dashboard.Models
 
-<div class="col-3 mx-4">
-    <div class="card h-100 text-center" style="border-color: white;">
-        <img class="card-img" src="@Owner.ImageUrl" alt="Avatar of @Owner.Name" />
-        <div class="card-body">
-            <h5 div="card-title">
-                @Owner.Name
-            </h5>
-            <p class="card-text">
-                @Owner.Description
-            </p>
-        </div>
+<div class="card h-100 text-center" style="border-color: white;">
+    <img class="card-img-top" src="@Owner.ImageUrl" alt="Avatar of @Owner.Name">
+    <div class="card-body">
+        <h5 div="card-title">
+            @Owner.Name
+        </h5>
+        <p class="card-text">
+            @Owner.Description
+        </p>
     </div>
 </div>
 

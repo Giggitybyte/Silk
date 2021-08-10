@@ -22,9 +22,13 @@ namespace Silk.Dashboard.Pages.Dashboard
         public ulong GuildIdParsed => ulong.Parse(GuildId);
 
         private readonly GreetingOption[] _greetingOptions = Enum.GetValues<GreetingOption>();
+        
+        private const uint MaxGreetingTextLength = 2000; // Max Characters for Discord Greeting Text
+        private uint RemainingChars => (uint)(MaxGreetingTextLength - _guildConfig.GreetingText.Length);
+        private string RemainingCharsClass => RemainingChars < 20 ? "text-danger" : "";
 
         private bool _requestFailed;
-        
+
         private DiscordGuild _guild;
         private GuildConfig _guildConfig;
 
@@ -43,7 +47,7 @@ namespace Silk.Dashboard.Pages.Dashboard
 
                 if (_guild is null)
                 {
-                    /* Todo: Handle this differently */
+                    /* Todo: Handle this differently? */
                     throw new Exception("The Guild requested was either unavailable or the request failed");
                 }
 
@@ -56,7 +60,7 @@ namespace Silk.Dashboard.Pages.Dashboard
             {
                 _requestFailed = true;
             }
-
+            
             return guildConfig;
         }
 

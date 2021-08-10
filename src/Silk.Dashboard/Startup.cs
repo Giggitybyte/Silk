@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Immutable;
 using System.Threading.Tasks;
 using AspNet.Security.OAuth.Discord;
 using Blazored.Toast;
@@ -7,7 +5,6 @@ using DSharpPlus;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
